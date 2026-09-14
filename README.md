@@ -11,13 +11,16 @@
 </p>
 
 > [!IMPORTANT]
-> 本仓库**仅供原作者 ezadiensi 本地使用**。
+> 本仓库是 <https://github.com/hicccc77/WeFlow> 的**公开归档 fork**。
+> 仅用于保留可构建的源码与本地定制修改，**不提供下载链接**。
 > 二改不应改动 `package.json` 中的 `name`、`author`、仓库地址等归属字段。
 > 协议：CC BY-NC-SA 4.0（继承自上游）。
 
 ## 本 fork 与上游的差异
 
-- **cache 目录 fallback 修复**：`ensureCacheDir` 在外置卷未挂载时不再崩溃，自动降级到 `app.getPath('cache')`。
+- **cache 目录 fallback 修复**：`ensureCacheDir` 在外置卷未挂载时不再崩溃，自动降级到 `app.getPath('userData')/cache`。
+- **SnsService 缓存目录 fallback**：朋友圈/表情缓存目录同样在 `cachePath` 不可写时降级。
+- **安全加固**：`uncaughtException` / `unhandledRejection` 全局兜底；release notes 不再用 `dangerouslySetInnerHTML` 渲染。
 - 后续本地修改会持续追加到本节。
 
 ## 原始功能（来自上游）
@@ -43,10 +46,11 @@ npm run build    # 清理 + tsc + vite + electron-builder
 - `release/mac-arm64/WeFlow.app` — 解包后的 app（可直接 cp 到 `/Applications/`）
 - `release/WeFlow-5.0.0-Setup.zip` — 压缩包
 
-> 本仓库是独立本地 fork，未配置 remote。同步上游请用 `git remote add upstream <url>` 后 `git fetch upstream`。
+> 同步上游请用 `git remote add upstream <url>` 后 `git fetch upstream`。
+> 上游 `hicccc77/WeFlow` 已被 DMCA 清空，无法再 fetch；本仓库为最后一版可构建源码。
 
 ## 致谢
 
-- 上游：<https://github.com/hicccc77/WeFlow>
+- 上游（已 DMCA）：<https://github.com/hicccc77/WeFlow>
 - 基础框架：[密语 CipherTalk](https://github.com/ILoveBingLu/miyu)
 - 视频解密参考：[WeChat-Channels-Video-File-Decryption](https://github.com/Evil0ctal/WeChat-Channels-Video-File-Decryption)
