@@ -34,11 +34,16 @@ WeFlow 是一个**完全本地**的微信**实时**聊天记录查看、分析�
 ## 构建
 
 ```bash
-npm install
-npm run build
+npm install      # 首次或依赖变化时
+npm run build    # 清理 + tsc + vite + electron-builder
 ```
 
-构建产物在 `release/` 下。
+构建产物：
+- `release/WeFlow-5.0.0-Setup.dmg` — 安装包
+- `release/mac-arm64/WeFlow.app` — 解包后的 app（可直接 cp 到 `/Applications/`）
+- `release/WeFlow-5.0.0-Setup.zip` — 压缩包
+
+> 本仓库是独立本地 fork，未配置 remote。同步上游请用 `git remote add upstream <url>` 后 `git fetch upstream`。
 
 ## 致谢
 
