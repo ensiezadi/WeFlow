@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Quote, X } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import LiquidGlass from './LiquidGlass'
 import './UpdateDialog.scss'
 
@@ -99,7 +101,25 @@ const UpdateDialog: React.FC<UpdateDialogProps> = ({
                         </div>
                         <div className="text-box">
                             {updateInfo.releaseNotes ? (
-                                <div dangerouslySetInnerHTML={{ __html: updateInfo.releaseNotes }} />
+                                <div className="update-notes-markdown">
+                                    <ReactMarkdown
+                                        remarkPlugins={[remarkGfm]}
+                                        skipHtml
+                                        components={{
+                                            a: ({ href, children }) => (
+                                                <a
+                                                    href={href}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                >
+                                                    {children}
+                                                </a>
+                                            )
+                                        }}
+                                    >
+                                        {updateInfo.releaseNotes}
+                                    </ReactMarkdown>
+                                </div>
                             ) : (
                                 <p>修复了一些已知问题，提升了稳定性。</p>
                             )}

@@ -45,6 +45,37 @@ import { imageDownloadService } from './services/imageDownloadService'
 // 回退采集只在通知展示的数秒内运行且分辨率已降为逻辑尺寸，放开预算不影响常态性能
 app.commandLine.appendSwitch('webrtc-max-cpu-consumption-percentage', '100')
 
+// 全局未捕获异常兜底：worker_threads 里的 Promise 拒绝或主进程同步 throw
+// 在缺省情况下会让 Electron 静默退出。这里统一落日志 + 通知渲染层，便于排查。
+const formatFatalError = (label: string, err: unknown): string => {
+  if (err instanceof Error) {
+    return `[${label}] ${err.name}: ${err.message}\n${err.stack || '(no stack)'}`
+  }
+  return `[${label}] ${String(err)}`
+}
+process.on('uncaughtException', (err) => {
+  console.error(formatFatalError('uncaughtException', err))
+  try {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (win.isDestroyed()) continue
+      win.webContents.send('main:fatalError', { source: 'uncaughtException', message: String((err as Error)?.message || err) })
+    }
+  } catch {
+    // ignore — renderer may be gone
+  }
+})
+process.on('unhandledRejection', (reason) => {
+  console.error(formatFatalError('unhandledRejection', reason))
+  try {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (win.isDestroyed()) continue
+      win.webContents.send('main:fatalError', { source: 'unhandledRejection', message: String((reason as Error)?.message || reason) })
+    }
+  } catch {
+    // ignore
+  }
+})
+
 // 配置自动更新
 autoUpdater.autoDownload = false
 autoUpdater.autoInstallOnAppQuit = true
