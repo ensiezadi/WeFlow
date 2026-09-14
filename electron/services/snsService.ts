@@ -9,6 +9,7 @@ import crypto from 'crypto'
 import { WasmService } from './wasmService'
 import zlib from 'zlib'
 import { escapeMarkdownLinkText, escapeMarkdownText, toMarkdownUrl } from './export/utils/markdown'
+import { ensureDirWithFallback, getDefaultCacheDir } from '../utils/pathUtils'
 
 export interface SnsLivePhoto {
     url: string
@@ -888,24 +889,54 @@ class SnsService {
         return Object.keys(merged).length > 0 ? merged : undefined
     }
 
+    private resolvedSnsCacheDir: string | null = null
+    private resolvedEmojiCacheDir: string | null = null
+
     private getSnsCacheDir(): string {
+        if (this.resolvedSnsCacheDir) return this.resolvedSnsCacheDir
         const configuredCachePath = String(this.configService.get('cachePath') || '').trim()
-        const baseDir = configuredCachePath || join(app.getPath('documents'), 'WeFlow')
-        const snsCacheDir = join(baseDir, 'sns_cache')
-        if (!existsSync(snsCacheDir)) {
-            mkdirSync(snsCacheDir, { recursive: true })
+        const osDocuments = (() => {
+          try { return app.getPath('documents') } catch { return '' }
+        })()
+        const defaultBase = osDocuments ? join(osDocuments, 'WeFlow') : getDefaultCacheDir('WeFlow')
+        // 候选链：用户配置 → Documents/WeFlow → 兜底 userData cache
+        const candidates = [configuredCachePath, defaultBase, getDefaultCacheDir('WeFlow')].filter(Boolean)
+        let lastError: unknown = null
+        for (const base of candidates) {
+          const dir = join(base, 'sns_cache')
+          const created = ensureDirWithFallback(dir, { fallbackDir: getDefaultCacheDir('WeFlow'), label: 'sns_cache' })
+          if (created) {
+            this.resolvedSnsCacheDir = created
+            return created
+          }
+          lastError = new Error(`mkdir failed for ${dir}`)
         }
-        return snsCacheDir
+        console.error('[SnsService] all sns_cache candidates failed:', lastError)
+        // 最后兜底：用 tmp 下的目录，至少不让调用方 throw
+        const tmpDir = join(require('os').tmpdir(), 'WeFlow-sns_cache')
+        this.resolvedSnsCacheDir = tmpDir
+        return tmpDir
     }
 
     private getEmojiCacheDir(): string {
+        if (this.resolvedEmojiCacheDir) return this.resolvedEmojiCacheDir
         const configuredCachePath = String(this.configService.get('cachePath') || '').trim()
-        const baseDir = configuredCachePath || join(app.getPath('documents'), 'WeFlow')
-        const emojiDir = join(baseDir, 'Emojis')
-        if (!existsSync(emojiDir)) {
-            mkdirSync(emojiDir, { recursive: true })
+        const osDocuments = (() => {
+          try { return app.getPath('documents') } catch { return '' }
+        })()
+        const defaultBase = osDocuments ? join(osDocuments, 'WeFlow') : getDefaultCacheDir('WeFlow')
+        const candidates = [configuredCachePath, defaultBase, getDefaultCacheDir('WeFlow')].filter(Boolean)
+        for (const base of candidates) {
+          const dir = join(base, 'Emojis')
+          const created = ensureDirWithFallback(dir, { fallbackDir: getDefaultCacheDir('WeFlow'), label: 'Emojis' })
+          if (created) {
+            this.resolvedEmojiCacheDir = created
+            return created
+          }
         }
-        return emojiDir
+        const tmpDir = join(require('os').tmpdir(), 'WeFlow-Emojis')
+        this.resolvedEmojiCacheDir = tmpDir
+        return tmpDir
     }
 
     /**

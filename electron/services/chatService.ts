@@ -9847,7 +9847,9 @@ class ChatService {
     try {
       const filePath = this.getTranscriptCachePath()
       const dir = dirname(filePath)
-      if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+      if (!existsSync(dir)) {
+        try { mkdirSync(dir, { recursive: true }) } catch { /* unwritable cachePath; cache write becomes a no-op */ return }
+      }
       const obj: Record<string, string> = {}
       for (const [k, v] of this.voiceTranscriptCache) obj[k] = v
       writeFileSync(filePath, JSON.stringify(obj), 'utf-8')
