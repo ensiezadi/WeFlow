@@ -1,0 +1,7 @@
+.env
+cloudflared.yml
+cloudflared.config.yml
+tunnel-credentials.json
+data/
+__pycache__/
+*.pyc

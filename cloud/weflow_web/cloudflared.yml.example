@@ -1,0 +1,9 @@
+tunnel: replace-with-tunnel-id
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  - hostname: wechat.ensiezadi.lol
+    service: http://weflow-web:8080
+    originRequest:
+      noTLSVerify: false
+  - service: http_status:404

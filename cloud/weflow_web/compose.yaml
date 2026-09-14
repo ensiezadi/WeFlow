@@ -1,0 +1,35 @@
+services:
+  weflow-web:
+    build:
+      context: ../..
+      dockerfile: cloud/weflow_web/Dockerfile
+    image: weflow-cloud:local
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:18080:8080"
+    volumes:
+      - weflow-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+
+  cloudflared:
+    image: cloudflare/cloudflared@sha256:51c9cefcb4569df44e1ad403ab1d3d8065aa8e84339bcfc6aee75502e1140339
+    restart: unless-stopped
+    depends_on:
+      weflow-web:
+        condition: service_healthy
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared.config.yml:/etc/cloudflared/config.yml:ro
+      - ./tunnel-credentials.json:/etc/cloudflared/credentials.json:ro
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  weflow-data:
+    name: weflow-cloud-data

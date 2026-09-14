@@ -1,0 +1,12 @@
+node_modules/
+dist/
+dist-electron/
+release/
+logs/
+*.log
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+temp_assets.json

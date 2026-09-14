@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#11110f" />
+    <title>WeFlow Web</title>
+    <link rel="stylesheet" href="/web/styles.css" />
+    <script src="/web/app.js" defer></script>
+  </head>
+  <body>
+    <div id="login-overlay" class="login-overlay">
+      <section class="login-card" aria-labelledby="login-title">
+        <div class="brand-mark" aria-hidden="true">W<span>F</span></div>
+        <div class="login-copy">
+          <p class="eyebrow">WEFLOW WEB</p>
+          <h1 id="login-title">连接你的微信足迹</h1>
+          <p>这是只读网页，不提供发送入口。请输入云端 WeFlow 的独立访问密码。</p>
+        </div>
+        <form id="login-form" class="login-form">
+          <label for="token-input">访问密码</label>
+          <div class="token-row">
+            <input id="token-input" type="password" autocomplete="current-password" spellcheck="false" placeholder="输入访问密码" required />
+            <button id="token-visibility" class="icon-button" type="button" aria-label="显示密码">显示</button>
+          </div>
+          <button id="connect-button" class="primary-button" type="submit">连接 WeFlow</button>
+          <p id="login-error" class="form-error" role="alert"></p>
+        </form>
+        <p class="privacy-note">登录状态使用 HttpOnly 安全 Cookie；网页脚本无法读取同步密钥。</p>
+      </section>
+    </div>
+
+    <div id="app" class="app-shell" aria-hidden="true" hidden>
+      <aside id="sidebar" class="sidebar">
+        <header class="sidebar-header">
+          <div class="brand-lockup">
+            <div class="brand-mark brand-mark-small" aria-hidden="true">W<span>F</span></div>
+            <div>
+              <strong>WeFlow</strong>
+              <span>只读模式</span>
+            </div>
+          </div>
+          <div class="sidebar-actions">
+            <button id="account-button" class="text-button" type="button" aria-haspopup="dialog" aria-controls="change-password-overlay">账户</button>
+            <button id="logout-button" class="text-button" type="button">断开</button>
+          </div>
+        </header>
+
+        <div class="connection-strip">
+          <span id="connection-dot" class="connection-dot"></span>
+          <span id="connection-label">正在连接实时消息…</span>
+        </div>
+
+        <div class="session-tools">
+          <label class="search-box" for="session-search">
+            <span aria-hidden="true">⌕</span>
+            <input id="session-search" type="search" placeholder="搜索会话" autocomplete="off" />
+          </label>
+          <button id="refresh-button" class="icon-button" type="button" aria-label="刷新会话">刷新</button>
+        </div>
+
+        <div id="session-list" class="session-list" role="listbox" aria-label="微信会话"></div>
+        <div id="session-empty" class="sidebar-empty" hidden>没有找到会话</div>
+      </aside>
+
+      <main class="chat-panel">
+        <header class="chat-header">
+          <button id="mobile-menu-button" class="mobile-menu-button" type="button" aria-label="打开会话列表">☰</button>
+          <div class="chat-title-wrap">
+            <h2 id="chat-title">选择一个会话</h2>
+            <p id="chat-subtitle">消息仅供查看，不会同步已读状态</p>
+          </div>
+          <span class="readonly-badge">只读</span>
+        </header>
+
+        <section id="welcome-panel" class="welcome-panel">
+          <div class="welcome-orbit" aria-hidden="true"><span>WF</span></div>
+          <h2>微信消息，实时抵达</h2>
+          <p>从左侧选择会话。新消息和撤回事件将自动刷新当前聊天。</p>
+        </section>
+
+        <section id="messages-panel" class="messages-panel" hidden>
+          <div id="load-more-wrap" class="load-more-wrap" hidden>
+            <button id="load-more-button" class="secondary-button" type="button">加载更早消息</button>
+          </div>
+          <div id="message-list" class="message-list" aria-live="polite"></div>
+          <div id="message-loading" class="message-loading" hidden>
+            <span class="spinner"></span>正在读取消息…
+          </div>
+          <div id="message-error" class="message-error" hidden></div>
+        </section>
+      </main>
+    </div>
+
+    <div id="mobile-scrim" class="mobile-scrim" hidden></div>
+    <div id="change-password-overlay" class="modal-overlay" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="change-password-title">
+        <header class="modal-header">
+          <div>
+            <p class="eyebrow">账户</p>
+            <h2 id="change-password-title">修改访问密码</h2>
+          </div>
+          <button id="change-password-close" class="icon-button" type="button" aria-label="关闭">关闭</button>
+        </header>
+        <p class="modal-intro">定期更换强密码能避免访问密钥落入错误的手里。新密码至少 12 位，且不能与当前密码相同。</p>
+        <form id="change-password-form" class="login-form">
+          <label for="current-password-input">当前密码</label>
+          <input id="current-password-input" type="password" autocomplete="current-password" spellcheck="false" required />
+          <label for="new-password-input">新密码</label>
+          <input id="new-password-input" type="password" autocomplete="new-password" spellcheck="false" minlength="12" required />
+          <label for="confirm-password-input">再次输入新密码</label>
+          <input id="confirm-password-input" type="password" autocomplete="new-password" spellcheck="false" minlength="12" required />
+          <button id="change-password-submit" class="primary-button" type="submit">更新密码</button>
+          <p id="change-password-error" class="form-error" role="alert"></p>
+        </form>
+      </div>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>
