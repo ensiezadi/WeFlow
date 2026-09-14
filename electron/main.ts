@@ -26,6 +26,7 @@ import { snsService, isVideoUrl } from './services/snsService'
 import { windowsHelloService } from './services/windowsHelloService'
 import { exportCardDiagnosticsService } from './services/exportCardDiagnosticsService'
 import { cloudControlService } from './services/cloudControlService'
+import { telegramService } from './services/telegramService'
 
 import { destroyNotificationWindow, registerNotificationHandlers, showNotification, setNotificationNavigateHandler } from './windows/notificationWindow'
 import { httpService } from './services/httpService'
@@ -2255,6 +2256,16 @@ function registerIpcHandlers() {
     return { success: true }
   })
 
+  ipcMain.handle('telegram:discoverChatIds', async (_, options?: { limit?: number; timeoutSec?: number; consume?: boolean }) => {
+    return telegramService.discoverChatIds(options || {})
+  })
+  ipcMain.handle('telegram:testSend', async (_, chatId: string, text?: string) => {
+    return telegramService.testSend(chatId, text)
+  })
+  ipcMain.handle('telegram:isReady', async () => {
+    return telegramService.isReady()
+  })
+
   ipcMain.handle('app:getDownloadsPath', async () => {
     return app.getPath('downloads')
   })
@@ -3757,7 +3768,30 @@ function registerIpcHandlers() {
 
     try {
       const result = await runWorker()
-      return await finalizeExportTaskControlResult(taskId, result)
+      const finalResult = await finalizeExportTaskControlResult(taskId, result)
+      // Telegram 推送（导出完成 / 失败）
+      try {
+        const success = finalResult?.success !== false && (finalResult?.failCount || 0) === 0
+        const total = (finalResult?.successCount || 0) + (finalResult?.failCount || 0)
+        const title = success ? '导出完成' : '导出失败'
+        const esc = (s: string) => String(s ?? '').replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1')
+        const lines = [
+          `*【WeFlow】${title}*`,
+          '',
+          `\\- 会话数：${esc(String(total))}`,
+          `\\- 成功：${esc(String(finalResult?.successCount || 0))}`,
+          `\\- 失败：${esc(String(finalResult?.failCount || 0))}`
+        ]
+        if (finalResult?.error) lines.push(`\\- 错误：${esc(String(finalResult.error).slice(0, 200))}`)
+        if (success && (finalResult as any)?.outputDir) {
+          lines.push(`\\- 路径：\`${esc(String((finalResult as any).outputDir).slice(0, 300))}\``)
+        }
+        telegramService.sendForTrigger('onExport', lines.join('\n'), { parseMode: 'MarkdownV2' })
+          .catch((e) => console.warn('[telegram] export push failed:', (e as Error)?.message))
+      } catch (e) {
+        console.warn('[telegram] export push setup failed:', (e as Error)?.message)
+      }
+      return finalResult
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       console.error(`[export-worker] ${errorMessage}`)

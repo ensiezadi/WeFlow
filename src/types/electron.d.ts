@@ -359,6 +359,26 @@ export interface ElectronAPI {
     openPath: (path: string) => Promise<string>
     openExternal: (url: string) => Promise<{ success: boolean; error?: string }>
   }
+  telegram: {
+    discoverChatIds: (options?: { limit?: number; timeoutSec?: number; consume?: boolean }) =>
+      Promise<{
+        ok: boolean
+        botUsername?: string
+        botId?: number
+        chats: Array<{
+          chatId: string
+          type: 'private' | 'group' | 'supergroup' | 'channel'
+          title?: string
+          username?: string
+          firstName?: string
+          lastName?: string
+          lastMessageAt?: number
+        }>
+        error?: string
+      }>
+    testSend: (chatId: string, text?: string) => Promise<{ ok: boolean; error?: string }>
+    isReady: () => Promise<{ ready: boolean; reason?: string }>
+  }
   app: {
     getDownloadsPath: () => Promise<string>
     getVersion: () => Promise<string>

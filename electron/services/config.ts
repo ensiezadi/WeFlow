@@ -129,6 +129,17 @@ interface ConfigSchema {
   /** Telegram 接收 Chat ID，逗号分隔，支持多个 */
   aiInsightTelegramChatIds: string
 
+  // 通用 Telegram 推送（除 AI Insight 外的导出/新消息事件共享这一组配置）
+  telegramEnabled: boolean
+  telegramBotToken: string
+  telegramChatIds: string
+  telegramOnInsight: boolean
+  telegramOnExport: boolean
+  telegramOnNewMessage: boolean
+  telegramNewMessageCooldownMs: number
+  telegramNewMessageFilterMode: 'all' | 'whitelist' | 'blacklist'
+  telegramNewMessageFilterIds: string
+
   // AI 足迹
   aiFootprintEnabled: boolean
   aiFootprintSystemPrompt: string
@@ -270,6 +281,15 @@ export class ConfigService {
       aiInsightTelegramEnabled: false,
       aiInsightTelegramToken: '',
       aiInsightTelegramChatIds: '',
+      telegramEnabled: false,
+      telegramBotToken: '',
+      telegramChatIds: '',
+      telegramOnInsight: true,
+      telegramOnExport: false,
+      telegramOnNewMessage: false,
+      telegramNewMessageCooldownMs: 5000,
+      telegramNewMessageFilterMode: 'all',
+      telegramNewMessageFilterIds: '',
       aiInsightWeiboCookie: '',
       aiInsightWeiboBindings: {},
       aiFootprintEnabled: false,

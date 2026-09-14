@@ -73,6 +73,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url)
   },
 
+  // Telegram
+  telegram: {
+    discoverChatIds: (options?: { limit?: number; timeoutSec?: number; consume?: boolean }) =>
+      ipcRenderer.invoke('telegram:discoverChatIds', options),
+    testSend: (chatId: string, text?: string) =>
+      ipcRenderer.invoke('telegram:testSend', chatId, text),
+    isReady: () => ipcRenderer.invoke('telegram:isReady')
+  },
+
   // App
   app: {
     getDownloadsPath: () => ipcRenderer.invoke('app:getDownloadsPath'),

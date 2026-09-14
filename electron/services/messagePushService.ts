@@ -2,6 +2,7 @@ import { ConfigService } from './config'
 import { chatService, type ChatSession, type Message } from './chatService'
 import { wcdbService } from './wcdbService'
 import { httpService } from './httpService'
+import { telegramService } from './telegramService'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { createHash } from 'crypto'
@@ -515,6 +516,22 @@ class MessagePushService {
       httpService.broadcastMessagePush(payload)
       this.rememberMessageKey(messageKey)
       this.bumpSessionBaseline(session.username, message)
+
+      // Telegram 推送（新消息）
+      if (payload.event === 'message.new') {
+        const esc = (s: string) => String(s ?? '').replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1')
+        const header = `*【WeFlow】新消息*`
+        const sender = payload.sourceName ? `*${esc(payload.sourceName)}*` : '匿名'
+        const body = esc(String(payload.content || '').slice(0, 500))
+        const sessionLine = payload.sessionType === 'group'
+          ? `群聊：${esc(String(payload.groupName || payload.sessionId))}`
+          : `私聊：${esc(String(payload.sourceName || payload.sessionId))}`
+        const text = `${header}\n\n${sender}\n${body}\n\n_${sessionLine}_`
+        telegramService.sendForTrigger('onNewMessage', text, {
+          parseMode: 'MarkdownV2',
+          sessionId: payload.sessionId
+        }).catch((e) => console.warn('[telegram] newMessage push failed:', (e as Error)?.message))
+      }
     }
 
     for (const message of fetchedMessages) {

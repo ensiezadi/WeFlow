@@ -16,6 +16,7 @@
 import https from 'https'
 import { URL } from 'url'
 import { ConfigService } from './config'
+import { TelegramService, telegramService } from './telegramService'
 import { chatService, ChatSession, Message } from './chatService'
 import { snsService } from './snsService'
 import { weiboService } from './social/weiboService'
@@ -1698,23 +1699,19 @@ ${afterText}
         insightLog('INFO', `AI 见解消息通知已关闭，跳过应用通知 → ${resolvedDisplayName}: ${insight}`)
       }
 
-      // 渠道二：Telegram Bot 推送（可选）
-      const telegramEnabled = this.config.get('aiInsightTelegramEnabled') as boolean
-      if (telegramEnabled) {
-        const telegramToken = (this.config.get('aiInsightTelegramToken') as string) || ''
-        const telegramChatIds = (this.config.get('aiInsightTelegramChatIds') as string) || ''
-        if (telegramToken && telegramChatIds) {
-          const chatIds = telegramChatIds.split(',').map((s) => s.trim()).filter(Boolean)
-          const telegramText = `【WeFlow】 ${notifTitle}\n\n${insight}`
-          for (const chatId of chatIds) {
-            this.sendTelegram(telegramToken, chatId, telegramText).catch((e) => {
-              insightLog('WARN', `Telegram 推送失败 (chatId=${chatId}): ${(e as Error).message}`)
-            })
+      // 渠道二：Telegram Bot 推送（共用 telegramService）
+      const insTitleEsc = TelegramService.escapeMarkdownV2(notifTitle)
+      const insInsightEsc = TelegramService.escapeMarkdownV2(insight)
+      const telegramText = `*【WeFlow】${insTitleEsc}*\n\n${insInsightEsc}`
+      telegramService.sendForTrigger('onInsight', telegramText, { parseMode: 'MarkdownV2' })
+        .then((r) => {
+          if (!r.sent && r.reason && r.reason !== 'trigger onInsight disabled') {
+            insightLog('WARN', `Telegram 推送跳过: ${r.reason}`)
           }
-        } else {
-          insightLog('WARN', 'Telegram 已启用但 Token 或 Chat ID 未填写，跳过')
-        }
-      }
+        })
+        .catch((e) => {
+          insightLog('WARN', `Telegram 推送失败: ${(e as Error).message}`)
+        })
 
       insightLog('INFO', `已完成 ${resolvedDisplayName} 的见解处理`)
       this.recordTrigger(sessionId)

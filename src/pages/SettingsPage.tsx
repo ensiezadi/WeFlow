@@ -355,6 +355,24 @@ function SettingsPage({ onClose }: SettingsPageProps = {}) {
   const [aiInsightTelegramEnabled, setAiInsightTelegramEnabled] = useState(false)
   const [aiInsightTelegramToken, setAiInsightTelegramToken] = useState('')
   const [aiInsightTelegramChatIds, setAiInsightTelegramChatIds] = useState('')
+  // 通用 Telegram 设置
+  const [tgEnabled, setTgEnabled] = useState(false)
+  const [tgBotToken, setTgBotToken] = useState('')
+  const [tgChatIds, setTgChatIds] = useState('')
+  const [tgOnInsight, setTgOnInsight] = useState(true)
+  const [tgOnExport, setTgOnExport] = useState(false)
+  const [tgOnNewMessage, setTgOnNewMessage] = useState(false)
+  const [tgNewMessageCooldownMs, setTgNewMessageCooldownMs] = useState(5000)
+  const [tgNewMessageFilterMode, setTgNewMessageFilterMode] = useState<'all' | 'whitelist' | 'blacklist'>('all')
+  const [tgNewMessageFilterIds, setTgNewMessageFilterIds] = useState('')
+  const [tgDiscovering, setTgDiscovering] = useState(false)
+  const [tgDiscovery, setTgDiscovery] = useState<{
+    botUsername?: string
+    chats: Array<{ chatId: string; type: string; title?: string; username?: string; firstName?: string }>
+    error?: string
+  }>({ chats: [] })
+  const [tgTesting, setTgTesting] = useState(false)
+  const [tgStatus, setTgStatus] = useState<string>('')
   const [aiInsightAllowSocialContext, setAiInsightAllowSocialContext] = useState(false)
   const [aiInsightSocialContextCount, setAiInsightSocialContextCount] = useState(3)
   const [aiInsightWeiboCookie, setAiInsightWeiboCookie] = useState('')
@@ -669,6 +687,25 @@ function SettingsPage({ onClose }: SettingsPageProps = {}) {
       setAiInsightTelegramEnabled(savedAiInsightTelegramEnabled)
       setAiInsightTelegramToken(savedAiInsightTelegramToken)
       setAiInsightTelegramChatIds(savedAiInsightTelegramChatIds)
+      // 通用 Telegram 设置加载（缺省时回退到旧 aiInsight 字段）
+      const tgEnabledRaw = await window.electronAPI.config.get('telegramEnabled')
+      const tgTokenRaw = await window.electronAPI.config.get('telegramBotToken')
+      const tgChatIdsRaw = await window.electronAPI.config.get('telegramChatIds')
+      const tgOnInsightRaw = await window.electronAPI.config.get('telegramOnInsight')
+      const tgOnExportRaw = await window.electronAPI.config.get('telegramOnExport')
+      const tgOnNewRaw = await window.electronAPI.config.get('telegramOnNewMessage')
+      const tgCooldownRaw = await window.electronAPI.config.get('telegramNewMessageCooldownMs')
+      const tgFilterModeRaw = await window.electronAPI.config.get('telegramNewMessageFilterMode')
+      const tgFilterIdsRaw = await window.electronAPI.config.get('telegramNewMessageFilterIds')
+      setTgEnabled(Boolean(tgEnabledRaw ?? savedAiInsightTelegramEnabled))
+      setTgBotToken(String(tgTokenRaw ?? savedAiInsightTelegramToken ?? ''))
+      setTgChatIds(String(tgChatIdsRaw ?? savedAiInsightTelegramChatIds ?? ''))
+      setTgOnInsight(tgOnInsightRaw !== false)
+      setTgOnExport(tgOnExportRaw === true)
+      setTgOnNewMessage(tgOnNewRaw === true)
+      setTgNewMessageCooldownMs(Number(tgCooldownRaw) || 5000)
+      setTgNewMessageFilterMode((tgFilterModeRaw as any) || 'all')
+      setTgNewMessageFilterIds(String(tgFilterIdsRaw || ''))
       setAiInsightAllowSocialContext(savedAiInsightAllowSocialContext)
       setAiInsightSocialContextCount(savedAiInsightSocialContextCount)
       setAiInsightWeiboCookie(savedAiInsightWeiboCookie)
@@ -3924,6 +3961,252 @@ function SettingsPage({ onClose }: SettingsPageProps = {}) {
               }}
             />
           </div>
+        </>
+      )}
+
+      <div className="divider" />
+
+      {/* 通用 Telegram 推送（AI Insight / 导出 / 新消息） */}
+      <div className="form-group">
+        <label>Telegram 通用推送（统一 token）</label>
+        <span className="form-hint">
+          填一个 Bot Token，应用会通过 getUpdates 自动读取所有给你 bot 发过消息的会话，
+          你只需要在手机里给 bot 发任意一句话，点「发现 chat_id」即可获得所有候选。
+          旧版只用于 AI Insight 的设置会被自动复用。
+        </span>
+        <div className="log-toggle-line">
+          <span className="log-status">{tgEnabled ? '已启用' : '未启用'}</span>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={tgEnabled}
+              onChange={async (e) => {
+                const val = e.target.checked
+                setTgEnabled(val)
+                await window.electronAPI.config.set('telegramEnabled', val)
+              }}
+            />
+            <span className="switch-slider" />
+          </label>
+        </div>
+      </div>
+
+      {tgEnabled && (
+        <>
+          <div className="form-group">
+            <label>Bot Token</label>
+            <input
+              type="password"
+              className="field-input"
+              style={{ width: '100%' }}
+              placeholder="从 @BotFather 获取，例如 7123456789:AAH... 共 35 字符"
+              value={tgBotToken}
+              onChange={(e) => {
+                const val = e.target.value.trim()
+                setTgBotToken(val)
+                scheduleConfigSave('telegramBotToken', () => window.electronAPI.config.set('telegramBotToken', val))
+              }}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={async () => {
+                  if (!tgBotToken) {
+                    setTgStatus('请先填写 Bot Token')
+                    return
+                  }
+                  setTgDiscovering(true)
+                  setTgStatus('正在调用 getUpdates…')
+                  try {
+                    const res = await window.electronAPI.telegram.discoverChatIds({ limit: 100, timeoutSec: 0, consume: false })
+                    if (!res.ok) {
+                      setTgStatus(`发现失败：${res.error || '未知错误'}`)
+                      setTgDiscovery({ chats: [] })
+                    } else {
+                      setTgDiscovery({
+                        botUsername: res.botUsername,
+                        chats: res.chats
+                      })
+                      setTgStatus(
+                        res.chats.length === 0
+                          ? '未发现任何会话。请先在 Telegram 里给这个 bot 发送任意一条消息，然后再点一次。'
+                          : `发现 ${res.chats.length} 个会话（bot: @${res.botUsername || '?'}）`
+                      )
+                    }
+                  } catch (e) {
+                    setTgStatus(`异常：${(e as Error).message}`)
+                  } finally {
+                    setTgDiscovering(false)
+                  }
+                }}
+                disabled={tgDiscovering}
+              >
+                <Search size={14} /> {tgDiscovering ? '发现中…' : '发现 chat_id'}
+              </button>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={async () => {
+                  if (!tgChatIds.trim()) {
+                    setTgStatus('请先填写一个 chat_id 再测试')
+                    return
+                  }
+                  setTgTesting(true)
+                  setTgStatus('正在发送测试消息…')
+                  try {
+                    const first = tgChatIds.split(/[,\s]+/)[0]
+                    const res = await window.electronAPI.telegram.testSend(first)
+                    if (res.ok) setTgStatus('测试消息已发送，请检查 Telegram')
+                    else setTgStatus(`测试失败：${res.error || '未知错误'}`)
+                  } catch (e) {
+                    setTgStatus(`异常：${(e as Error).message}`)
+                  } finally {
+                    setTgTesting(false)
+                  }
+                }}
+                disabled={tgTesting}
+              >
+                <Plug size={14} /> {tgTesting ? '发送中…' : '测试推送'}
+              </button>
+            </div>
+            {tgStatus && <div className="form-hint" style={{ marginTop: 6 }}>{tgStatus}</div>}
+            {tgDiscovery.chats.length > 0 && (
+              <div style={{ marginTop: 10, maxHeight: 220, overflow: 'auto', border: '1px solid #4443', borderRadius: 6, padding: 8 }}>
+                {tgDiscovery.chats.map((c) => {
+                  const checked = tgChatIds.split(/[,\s]+/).filter(Boolean).includes(c.chatId)
+                  const label = c.title || c.username
+                    ? `${c.type === 'private' ? (c.firstName || '私聊') : c.title || c.username}（${c.chatId}）`
+                    : c.chatId
+                  return (
+                    <label key={c.chatId} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '2px 0' }}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          const ids = new Set(tgChatIds.split(/[,\s]+/).filter(Boolean))
+                          if (e.target.checked) ids.add(c.chatId)
+                          else ids.delete(c.chatId)
+                          const next = Array.from(ids).join(', ')
+                          setTgChatIds(next)
+                          window.electronAPI.config.set('telegramChatIds', next)
+                        }}
+                      />
+                      <span>{label}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label>手动编辑 Chat ID 列表</label>
+            <input
+              type="text"
+              className="field-input"
+              style={{ width: '100%' }}
+              placeholder="123456789, -1001234567890"
+              value={tgChatIds}
+              onChange={(e) => {
+                const val = e.target.value
+                setTgChatIds(val)
+                scheduleConfigSave('telegramChatIds', () => window.electronAPI.config.set('telegramChatIds', val))
+              }}
+            />
+            <span className="form-hint">支持英文逗号或空格分隔。修改后上面的发现列表会自动同步勾选状态。</span>
+          </div>
+
+          <div className="form-group">
+            <label>触发事件</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={tgOnInsight}
+                  onChange={(e) => {
+                    const val = e.target.checked
+                    setTgOnInsight(val)
+                    window.electronAPI.config.set('telegramOnInsight', val)
+                  }}
+                />
+                {' '}AI 见解生成时推送
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={tgOnExport}
+                  onChange={(e) => {
+                    const val = e.target.checked
+                    setTgOnExport(val)
+                    window.electronAPI.config.set('telegramOnExport', val)
+                  }}
+                />
+                {' '}导出任务完成 / 失败时推送
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={tgOnNewMessage}
+                  onChange={(e) => {
+                    const val = e.target.checked
+                    setTgOnNewMessage(val)
+                    window.electronAPI.config.set('telegramOnNewMessage', val)
+                  }}
+                />
+                {' '}收到新消息时推送（建议配合下面的过滤名单和冷却使用）
+              </label>
+            </div>
+          </div>
+
+          {tgOnNewMessage && (
+            <>
+              <div className="form-group">
+                <label>新消息冷却（毫秒 / 每会话）</label>
+                <input
+                  type="number"
+                  className="field-input"
+                  style={{ width: 200 }}
+                  min={0}
+                  step={1000}
+                  value={tgNewMessageCooldownMs}
+                  onChange={(e) => {
+                    const val = Math.max(0, Number(e.target.value) || 0)
+                    setTgNewMessageCooldownMs(val)
+                    window.electronAPI.config.set('telegramNewMessageCooldownMs', val)
+                  }}
+                />
+                <span className="form-hint">同一会话相邻两次推送最少间隔。默认 5000（5 秒）。</span>
+              </div>
+              <div className="form-group">
+                <label>新消息过滤</label>
+                <select
+                  className="field-input"
+                  style={{ width: 200 }}
+                  value={tgNewMessageFilterMode}
+                  onChange={(e) => {
+                    const val = e.target.value as 'all' | 'whitelist' | 'blacklist'
+                    setTgNewMessageFilterMode(val)
+                    window.electronAPI.config.set('telegramNewMessageFilterMode', val)
+                  }}
+                >
+                  <option value="all">全部会话</option>
+                  <option value="whitelist">仅推送白名单</option>
+                  <option value="blacklist">排除黑名单</option>
+                </select>
+                <input
+                  type="text"
+                  className="field-input"
+                  style={{ width: '100%', marginTop: 6 }}
+                  placeholder="会话 wxid / 群 id，多个用逗号或空格分隔"
+                  value={tgNewMessageFilterIds}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setTgNewMessageFilterIds(val)
+                    window.electronAPI.config.set('telegramNewMessageFilterIds', val)
+                  }}
+                />
+              </div>
+            </>
+          )}
         </>
       )}
 
