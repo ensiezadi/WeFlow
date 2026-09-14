@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'fs'
 import { writeFile } from 'fs/promises'
 import { app } from 'electron'
 import { ConfigService } from './config'
+import { ensureDirWithFallback, getDefaultCacheDir } from '../utils/pathUtils'
 
 const CACHE_VERSION = 1
 const MAX_GROUP_ENTRIES_PER_SCOPE = 3000
@@ -61,8 +62,13 @@ export class GroupMyMessageCountCacheService {
 
   private ensureCacheDir(): void {
     const dir = dirname(this.cacheFilePath)
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true })
+    if (existsSync(dir)) return
+    const created = ensureDirWithFallback(dir, {
+      fallbackDir: getDefaultCacheDir('WeFlow'),
+      label: 'group-my-message-counts'
+    })
+    if (created && created !== dir) {
+      this.cacheFilePath = join(created, 'group-my-message-counts.json')
     }
   }
 

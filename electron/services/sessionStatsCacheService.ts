@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'fs'
 import { writeFile } from 'fs/promises'
 import { app } from 'electron'
 import { ConfigService } from './config'
+import { ensureDirWithFallback, getDefaultCacheDir } from '../utils/pathUtils'
 
 /** 缓存版本号。增加/修改 SessionStatsCacheStats 字段后必须提升，避免旧缓存被误用。 */
 const CACHE_VERSION = 4
@@ -153,8 +154,13 @@ export class SessionStatsCacheService {
 
   private ensureCacheDir(): void {
     const dir = dirname(this.cacheFilePath)
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true })
+    if (existsSync(dir)) return
+    const created = ensureDirWithFallback(dir, {
+      fallbackDir: getDefaultCacheDir('WeFlow'),
+      label: 'session-stats'
+    })
+    if (created && created !== dir) {
+      this.cacheFilePath = join(created, 'session-stats.json')
     }
   }
 

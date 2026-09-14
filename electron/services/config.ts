@@ -2,7 +2,7 @@
 import { existsSync, readdirSync, statSync } from 'fs'
 import crypto from 'crypto'
 import Store from 'electron-store'
-import { expandHomePath } from '../utils/pathUtils'
+import { expandHomePath, getDefaultCacheDir, getOsUserDataPath } from '../utils/pathUtils'
 import { CacheMapStore } from './cacheMapStore'
 
 // 条件导入 electron（Worker 环境中不可用）
@@ -1110,11 +1110,39 @@ export class ConfigService {
     if (workerUserDataPath) {
       return workerUserDataPath
     }
-    return app?.getPath?.('userData') || process.cwd()
+    // Prefer Electron's app.getPath when available; otherwise fall back to the
+    // OS-managed userData directory. This keeps `app.isPackaged` aware paths
+    // working even before `app.whenReady()` resolves.
+    try {
+      if (typeof app?.getPath === 'function') {
+        return app.getPath('userData')
+      }
+    } catch {
+      // ignore — getPath can throw if app is not ready yet
+    }
+    return join(getOsUserDataPath(), 'WeFlow')
   }
 
   getCacheBasePath(): string {
-    return join(this.getUserDataPath(), 'cache')
+    const primary = join(this.getUserDataPath(), 'cache')
+    // Validate writability eagerly so downstream `mkdirSync(dirname(...))`
+    // calls do not crash when the configured userData path is on an unmounted
+    // external volume or under a read-only /Volumes/<x> root.
+    return this.resolveWritableCacheBasePath(primary)
+  }
+
+  private resolvedCacheBasePath: string | null = null
+  private resolveWritableCacheBasePath(primary: string): string {
+    if (this.resolvedCacheBasePath) return this.resolvedCacheBasePath
+    // Lazy require to avoid a hard dependency cycle in worker threads.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { ensureDirWithFallback } = require('../utils/pathUtils') as typeof import('../utils/pathUtils')
+    const created = ensureDirWithFallback(primary, {
+      fallbackDir: getDefaultCacheDir('WeFlow'),
+      label: 'cache'
+    })
+    this.resolvedCacheBasePath = created || primary
+    return this.resolvedCacheBasePath
   }
 
   getAll(): Partial<ConfigSchema> {

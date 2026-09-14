@@ -2,6 +2,7 @@ import { join, dirname } from 'path'
 import { existsSync, mkdirSync, readFileSync, rmSync, promises as fsPromises } from 'fs'
 import { app } from 'electron'
 import { ConfigService } from './config'
+import { ensureDirWithFallback, getDefaultCacheDir } from '../utils/pathUtils'
 
 export interface SessionMessageCacheEntry {
   version?: number
@@ -32,8 +33,13 @@ export class MessageCacheService {
 
   private ensureCacheDir() {
     const dir = dirname(this.cacheFilePath)
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true })
+    if (existsSync(dir)) return
+    const created = ensureDirWithFallback(dir, {
+      fallbackDir: getDefaultCacheDir('WeFlow'),
+      label: 'session-messages'
+    })
+    if (created && created !== dir) {
+      this.cacheFilePath = join(created, 'session-messages.json')
     }
   }
 

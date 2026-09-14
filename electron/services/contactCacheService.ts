@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'fs'
 import { writeFile } from 'fs/promises'
 import { app } from 'electron'
 import { ConfigService } from './config'
+import { ensureDirWithFallback, getDefaultCacheDir } from '../utils/pathUtils'
 
 export interface ContactCacheEntry {
   displayName?: string
@@ -29,8 +30,13 @@ export class ContactCacheService {
 
   private ensureCacheDir() {
     const dir = dirname(this.cacheFilePath)
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true })
+    if (existsSync(dir)) return
+    const created = ensureDirWithFallback(dir, {
+      fallbackDir: getDefaultCacheDir('WeFlow'),
+      label: 'contacts'
+    })
+    if (created && created !== dir) {
+      this.cacheFilePath = join(created, 'contacts.json')
     }
   }
 

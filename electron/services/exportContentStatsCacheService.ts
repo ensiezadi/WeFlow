@@ -1,6 +1,7 @@
 import { join, dirname } from 'path'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { ConfigService } from './config'
+import { ensureDirWithFallback, getDefaultCacheDir } from '../utils/pathUtils'
 
 const CACHE_VERSION = 1
 const MAX_SCOPE_ENTRIES = 12
@@ -106,8 +107,13 @@ export class ExportContentStatsCacheService {
 
   private ensureCacheDir(): void {
     const dir = dirname(this.cacheFilePath)
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true })
+    if (existsSync(dir)) return
+    const created = ensureDirWithFallback(dir, {
+      fallbackDir: getDefaultCacheDir('WeFlow'),
+      label: 'export-content-stats'
+    })
+    if (created && created !== dir) {
+      this.cacheFilePath = join(created, 'export-content-stats.json')
     }
   }
 
