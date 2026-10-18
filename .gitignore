@@ -2,6 +2,8 @@ node_modules/
 dist/
 dist-electron/
 release/
+release-local/
+cache/
 logs/
 *.log
 .DS_Store
@@ -10,3 +12,5 @@ logs/
 *.swp
 *.swo
 temp_assets.json
+local-diary-archive/
+local-tools/

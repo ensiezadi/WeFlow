@@ -382,6 +382,8 @@ export class WcdbCore {
 
   private formatInitProtectionError(code: number): string {
     const messages: Record<number, string> = {
+      '-101': 'Windows 数据库组件已超过内置有效期，请更新或修复 WCDB 原生组件；此错误发生在数据库密钥校验之前',
+      '-1000': '数据库组件的日期检查未通过，请更新或修复 WCDB 原生组件',
       '-3001': '未找到数据库目录 (db_storage)，请确认已选择正确的微信数据目录（应包含以 wxid_ 开头的子文件夹）',
       '-3002': '未找到 session.db 文件，请确认微信已登录并且数据目录完整',
       '-3003': '数据库句柄无效，请重试',

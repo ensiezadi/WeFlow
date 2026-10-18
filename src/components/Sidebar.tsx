@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Home, MessageSquare, BarChart3, FileText, Settings, Download, Aperture, UserCircle, Lock, LockOpen, ChevronUp, FolderClosed, Footprints, Users, ArchiveRestore, Sparkles } from 'lucide-react'
+import { Home, BookOpen, MessageSquare, BarChart3, FileText, Settings, Download, Aperture, UserCircle, Lock, LockOpen, ChevronUp, FolderClosed, Footprints, Users, ArchiveRestore, Sparkles } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import * as configService from '../services/config'
 import { onExportSessionStatus, requestExportSessionStatus } from '../services/exportBridge'
@@ -323,6 +323,12 @@ function Sidebar({ collapsed }: SidebarProps) {
           >
             <span className="nav-icon"><Home size={20} /></span>
             <span className="nav-label">首页</span>
+          </NavLink>
+
+          {/* 聊天 */}
+          <NavLink to="/diary" className={`nav-item ${isActive('/diary') ? 'active' : ''}`} title={collapsed ? '聊天日记' : undefined}>
+            <span className="nav-icon"><BookOpen size={20} /></span>
+            <span className="nav-label">聊天日记</span>
           </NavLink>
 
           {/* 聊天 */}

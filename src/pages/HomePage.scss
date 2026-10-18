@@ -117,3 +117,14 @@
     font-size: 14px;
   }
 }
+.home-diary-entry {
+  display: inline-block;
+  margin-top: 26px;
+  padding: 12px 22px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  color: var(--primary);
+  font-size: 13px;
+  text-decoration: none;
+  background: var(--bg-primary);
+}

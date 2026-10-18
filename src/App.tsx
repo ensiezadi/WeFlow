@@ -23,6 +23,7 @@ import { resolveAutomationScopeKey } from './pages/Export/hooks/useAutomation'
 // 常驻的通知窗口等独立窗口路由也因此只加载各自的小 chunk，
 // 显著降低每个渲染进程的 JS 堆占用与启动时间
 const WelcomePage = lazy(() => import('./pages/WelcomePage'))
+const ChatDiaryPage = lazy(() => import('./pages/ChatDiaryPage'))
 const ChatPage = lazy(() => import('./pages/ChatPage'))
 const AnalyticsWelcomePage = lazy(() => import('./pages/AnalyticsWelcomePage'))
 const ChatAnalyticsHubPage = lazy(() => import('./pages/ChatAnalyticsHubPage'))
@@ -776,6 +777,7 @@ function App() {
               <Routes location={routeLocation}>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/home" element={<HomePage />} />
+                <Route path="/diary" element={<ChatDiaryPage />} />
                 <Route path="/account-management" element={<AccountManagementPage />} />
                 <Route path="/chat" element={<ChatPage />} />
 

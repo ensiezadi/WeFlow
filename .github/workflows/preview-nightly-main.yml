@@ -128,6 +128,7 @@ jobs:
         run: |
           npx tsc
           npx vite build
+          node scripts/build-snapshot-agent.cjs
 
       - name: Package macOS arm64 preview artifacts
         env:
@@ -187,6 +188,7 @@ jobs:
         run: |
           npx tsc
           npx vite build
+          node scripts/build-snapshot-agent.cjs
 
       - name: Package Linux preview artifacts
         env:
@@ -240,6 +242,7 @@ jobs:
         run: |
           npx tsc
           npx vite build
+          node scripts/build-snapshot-agent.cjs
 
       - name: Package Windows x64 preview artifacts
         env:
@@ -293,6 +296,7 @@ jobs:
         run: |
           npx tsc
           npx vite build
+          node scripts/build-snapshot-agent.cjs
 
       - name: Package Windows arm64 preview artifacts
         env:

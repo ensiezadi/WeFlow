@@ -101,6 +101,7 @@ jobs:
         run: |
           npx tsc
           npx vite build
+          node scripts/build-snapshot-agent.cjs
 
       - name: Package macOS arm64 dev artifacts
         shell: bash
@@ -157,6 +158,7 @@ jobs:
         run: |
           npx tsc
           npx vite build
+          node scripts/build-snapshot-agent.cjs
 
       - name: Package Linux dev artifacts
         run: |
@@ -206,6 +208,7 @@ jobs:
         run: |
           npx tsc
           npx vite build
+          node scripts/build-snapshot-agent.cjs
 
       - name: Package Windows x64 dev artifacts
         run: |
@@ -255,6 +258,7 @@ jobs:
         run: |
           npx tsc
           npx vite build
+          node scripts/build-snapshot-agent.cjs
 
       - name: Package Windows arm64 dev artifacts
         run: |

@@ -1,0 +1,34 @@
+name: Windows local workflow build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/workflow-safe-windows-build
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Verify archive, game guards and launch arguments
+        run: node --test tests/chatDiary.test.mjs tests/deviceTimeline.test.cjs tests/snapshots.test.mjs tests/workflow.test.mjs tests/workflowGameGuard.test.mjs tests/snapshotPackaging.test.mjs
+      - name: Build Windows x64 installer
+        run: npm run build:win:local
+      - name: Verify packaged agent and frontend
+        run: node scripts/verify-windows-package.cjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WeFlow-Windows-x64-local
+          path: |
+            release-local/*Setup.exe
+            release-local/build-info.json
+          if-no-files-found: error

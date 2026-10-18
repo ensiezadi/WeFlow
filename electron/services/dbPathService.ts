@@ -113,6 +113,7 @@ export class DbPathService {
       } else {
         // Windows 微信4.x 数据目录
         possiblePaths.push(join(home, 'Documents', 'xwechat_files'))
+        possiblePaths.push(join(home, 'xwechat_files'))
       }
 
       for (const path of possiblePaths) {
