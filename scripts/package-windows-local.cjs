@@ -1,5 +1,5 @@
 const { spawnSync, execFileSync } = require('node:child_process')
-const { readFileSync, writeFileSync, createReadStream, readdirSync } = require('node:fs')
+const { readFileSync, writeFileSync, createReadStream, readdirSync, existsSync } = require('node:fs')
 const { join, resolve } = require('node:path')
 const { createHash } = require('node:crypto')
 const root = resolve(__dirname, '..')
@@ -11,7 +11,7 @@ const repair = spawnSync(process.execPath, [join(root, 'scripts/repair-windows-w
 if (repair.error) throw repair.error
 if (repair.status !== 0) process.exit(repair.status || 1)
 const builderArgs = [join(root, 'node_modules/electron-builder/cli.js'), '--win', ...(process.argv.includes('--dir') ? ['--dir'] : ['nsis']), '--x64', '--publish', 'never',
-  '--config.electronDist=node_modules/electron/dist', '--config.directories.output=release-local',
+  ...(existsSync(join(root, 'node_modules/electron/dist/electron.exe')) ? ['--config.electronDist=node_modules/electron/dist'] : []), '--config.directories.output=release-local',
   `--config.extraMetadata.version=${version}`, '--config.extraMetadata.localBuild=true', '--config.artifactName=${productName}-${version}-x64-Setup.${ext}']
 const result = spawnSync(process.execPath, builderArgs, { cwd: root, env: { ...process.env, CSC_IDENTITY_AUTO_DISCOVERY: 'false' }, stdio: 'inherit', windowsHide: true })
 if (result.error) throw result.error

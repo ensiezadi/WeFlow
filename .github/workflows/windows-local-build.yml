@@ -18,6 +18,8 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - name: Use the validated npm version for native install scripts
+        run: npm install --global npm@10.9.2
       - run: npm ci
       - name: Verify archive, game guards and launch arguments
         run: node --test tests/chatDiary.test.mjs tests/deviceTimeline.test.cjs tests/snapshots.test.mjs tests/workflow.test.mjs tests/workflowGameGuard.test.mjs tests/snapshotPackaging.test.mjs
