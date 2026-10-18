@@ -12,7 +12,7 @@
 
 > [!IMPORTANT]
 > 本仓库是 <https://github.com/hicccc77/WeFlow> 的**公开归档 fork**。
-> 仅用于保留可构建的源码与本地定制修改，**不提供下载链接**。
+> 用于保留可构建的源码与本地定制修改。Windows 本地版本可按下方命令构建，测试安装包通过本仓库的构建产物提供。
 > 二改不应改动 `package.json` 中的 `name`、`author`、仓库地址等归属字段。
 > 协议：CC BY-NC-SA 4.0（继承自上游）。
 
@@ -21,6 +21,8 @@
 - **cache 目录 fallback 修复**：`ensureCacheDir` 在外置卷未挂载时不再崩溃，自动降级到 `app.getPath('userData')/cache`。
 - **SnsService 缓存目录 fallback**：朋友圈/表情缓存目录同样在 `cachePath` 不可写时降级。
 - **安全加固**：`uncaughtException` / `unhandledRejection` 全局兜底；release notes 不再用 `dangerouslySetInnerHTML` 渲染。
+- **本地工作流日记**：前台窗口 OCR、文字证据与片段编辑；默认关闭、每次运行需手动开启，停止采集或退出应用后停止代理。游戏与全屏保护参见[说明](docs/DEVICE-TIMELINE.md)。
+- **Windows 本地构建**：安装包包含采集代理和 OCR 辅助脚本，不依赖源码目录或后台计划任务。
 - 后续本地修改会持续追加到本节。
 
 ## 原始功能（来自上游）
@@ -41,10 +43,21 @@ npm install      # 首次或依赖变化时
 npm run build    # 清理 + tsc + vite + electron-builder
 ```
 
-构建产物：
-- `release/WeFlow-5.0.0-Setup.dmg` — 安装包
-- `release/mac-arm64/WeFlow.app` — 解包后的 app（可直接 cp 到 `/Applications/`）
-- `release/WeFlow-5.0.0-Setup.zip` — 压缩包
+Windows x64 本地版本：
+
+```bash
+npm ci
+npm run build:win:local
+node scripts/verify-windows-package.cjs
+```
+
+- `release-local/*-x64-Setup.exe`：Windows 安装包，带 `local` 版本标识。
+- `release-local/win-unpacked/WeFlow.exe`：无需安装，可直接运行。
+- `release-local/build-info.json`：源码提交、构建时间和安装包 SHA256。
+- 直接打开解包版或安装后的软件即可查看记录，数据统一保存在应用用户目录，重启和升级后保留。附近的旧归档首次启动自动复制迁入，也可在日记页选择「导入已有记录」。`Start-WeFlow.cmd` 为可选快捷入口。
+
+本地测试版本不会自动检查上游更新，也不会创建后台采集计划任务。
+详见 [Windows 本地运行与构建](docs/WINDOWS-LOCAL-RUN.md)。
 
 > 同步上游请用 `git remote add upstream <url>` 后 `git fetch upstream`。
 > 上游 `hicccc77/WeFlow` 已被 DMCA 清空，无法再 fetch；本仓库为最后一版可构建源码。

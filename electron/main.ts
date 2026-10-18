@@ -1,5 +1,5 @@
 import './preload-env'
-import { app, BrowserWindow, ipcMain, nativeTheme, session, Tray, Menu, nativeImage } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, session, Tray, Menu, nativeImage, globalShortcut } from 'electron'
 import { Worker } from 'worker_threads'
 import { randomUUID } from 'crypto'
 import { join, dirname } from 'path'
@@ -27,6 +27,8 @@ import { windowsHelloService } from './services/windowsHelloService'
 import { exportCardDiagnosticsService } from './services/exportCardDiagnosticsService'
 import { cloudControlService } from './services/cloudControlService'
 import { telegramService } from './services/telegramService'
+import { readDeviceTimeline } from './services/deviceTimelineService'
+import { getSnapshots, enableSnapshots, getSnapshotImage, saveSnapshotNote, captureSnapshotNow, saveWorkflowEdit, saveWorkflowSettings, initializeSnapshots, shutdownSnapshots, snapshotRoot, importSavedDeviceArchive } from './services/snapshotService'
 
 import { destroyNotificationWindow, registerNotificationHandlers, showNotification, setNotificationNavigateHandler } from './windows/notificationWindow'
 import { httpService } from './services/httpService'
@@ -1091,13 +1093,13 @@ const getPlatformIconName = (): string => {
 
 const resolveAppIconPath = (): string => {
   const iconName = getPlatformIconName()
-  if (!process.env.VITE_DEV_SERVER_URL) {
-    return join(process.resourcesPath, iconName)
-  }
-  if (process.platform === 'darwin') {
-    return join(__dirname, '../resources/icons/macos/icon.icns')
-  }
-  return join(__dirname, `../public/${iconName}`)
+  const candidates = [
+    join(process.resourcesPath, iconName),
+    process.platform === 'darwin'
+      ? join(__dirname, '../resources/icons/macos/icon.icns')
+      : join(__dirname, `../public/${iconName}`)
+  ]
+  return candidates.find(candidate => existsSync(candidate)) || candidates[0]
 }
 
 const requestMainWindowCloseConfirmation = (win: BrowserWindow): void => {
@@ -1744,9 +1746,18 @@ function createSessionChatWindow(sessionId: string, options?: OpenSessionChatWin
 
 function showMainWindow() {
   shouldShowMain = true
-  if (mainWindowReady) {
-    mainWindow?.show()
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    mainWindow = createWindow({ autoShow: false })
   }
+  const targetWindow = mainWindow
+  const reveal = () => {
+    if (targetWindow.isDestroyed()) return
+    if (targetWindow.isMinimized()) targetWindow.restore()
+    targetWindow.show()
+    targetWindow.focus()
+  }
+  if (mainWindowReady) reveal()
+  else targetWindow.once('ready-to-show', reveal)
 }
 
 const normalizeAccountId = (value: string): string => {
@@ -2239,6 +2250,64 @@ function registerIpcHandlers() {
   ipcMain.handle('dialog:saveFile', async (_, options) => {
     const { dialog } = await import('electron')
     return dialog.showSaveDialog(options)
+  })
+
+  const deviceArchivePath = dirname(snapshotRoot())
+  ipcMain.handle('diary:deviceTimeline', (_, day?: unknown) => readDeviceTimeline(deviceArchivePath, day))
+  ipcMain.handle('diary:snapshots', (_, day?: unknown) => {
+    if (day !== undefined && typeof day !== 'string') throw new Error('日期格式无效')
+    return getSnapshots(day as string | undefined)
+  })
+  ipcMain.handle('diary:snapshotEnabled', async (_, enabled: unknown) => {
+    if (typeof enabled !== 'boolean') throw new Error('设置无效')
+    await enableSnapshots(enabled)
+    globalShortcut.unregister('Control+Alt+F8')
+    if (enabled && !globalShortcut.register('Control+Alt+F8', () => { void captureSnapshotNow().catch(error => console.warn('[Snapshot]', String(error))) })) console.warn('[Snapshot] Ctrl+Alt+F8 unavailable')
+  })
+  ipcMain.handle('diary:snapshotNow', () => captureSnapshotNow())
+  ipcMain.handle('diary:snapshotImage', (_, day: string, id: string) => getSnapshotImage(day, id))
+  ipcMain.handle('diary:snapshotNote', (_, day: string, id: string, note: string) => saveSnapshotNote(day, id, note))
+  ipcMain.handle('diary:workflowEdit', (_, day: string, edit: import('../src/types/workflow').WorkflowEdit) => saveWorkflowEdit(day, edit))
+  ipcMain.handle('diary:workflowSettings', (_, settings: import('../src/types/workflow').WorkflowSettings) => saveWorkflowSettings(settings))
+  ipcMain.handle('diary:openDeviceArchive', async () => {
+    await mkdir(deviceArchivePath, { recursive: true })
+    const { shell } = await import('electron')
+    return shell.openPath(deviceArchivePath)
+  })
+  ipcMain.handle('diary:importDeviceArchive', async (event) => {
+    if (await getSnapshots().then(view => view.enabled)) throw new Error('请先停止采集，再导入已有记录')
+    const { dialog } = await import('electron')
+    const owner = BrowserWindow.fromWebContents(event.sender)
+    if (!owner) throw new Error('找不到日记窗口')
+    const selected = await dialog.showOpenDialog(owner, { title: '选择已有记录的归档目录', properties: ['openDirectory'] })
+    if (selected.canceled || !selected.filePaths[0]) return { canceled: true }
+    return importSavedDeviceArchive(selected.filePaths[0])
+  })
+
+  ipcMain.handle('diary:save', async (event, payload: unknown) => {
+    if (!payload || typeof payload !== 'object') return { success: false, error: '无效的日记内容' }
+    const { day, format, content } = payload as Record<string, unknown>
+    if (typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(day) ||
+        (format !== 'md' && format !== 'json') || typeof content !== 'string' ||
+        Buffer.byteLength(content, 'utf8') > 64 * 1024 * 1024) {
+      return { success: false, error: '日记格式无效或文件超过 64 MB，请缩小筛选范围' }
+    }
+    try {
+      if (format === 'json') JSON.parse(content)
+      const { dialog } = await import('electron')
+      const owner = BrowserWindow.fromWebContents(event.sender)
+      if (!owner) return { success: false, error: '找不到日记窗口' }
+      const result = await dialog.showSaveDialog(owner, {
+        title: '保存本地聊天日记',
+        defaultPath: join(app.getPath('documents'), `${day}-聊天日记.${format}`),
+        filters: [{ name: format === 'md' ? 'Markdown 日记' : 'JSON 日记', extensions: [format] }]
+      })
+      if (result.canceled || !result.filePath) return { success: false, canceled: true }
+      await writeFile(result.filePath, content, 'utf8')
+      return { success: true, filePath: result.filePath }
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) }
+    }
   })
 
   ipcMain.handle('shell:openPath', async (_, path: string) => {
@@ -4126,10 +4195,15 @@ function registerIpcHandlers() {
       console.error('保存引导完成状态失败:', e)
     }
 
+    // The hidden renderer was loaded before credentials were configured.
+    // Reload it so it connects with the saved account and refreshes route state.
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.reload()
+    }
+    showMainWindow()
     if (onboardingWindow && !onboardingWindow.isDestroyed()) {
       onboardingWindow.close()
     }
-    showMainWindow()
     return true
   })
 
@@ -4615,12 +4689,13 @@ function checkForUpdatesOnStartup() {
 }
 
 app.whenReady().then(async () => {
+  await initializeSnapshots()
   // 先初始化配置，以便在启动早期判定是否需要静默启动
   configService = new ConfigService()
   applyAutoUpdateChannel('startup')
   syncLaunchAtStartupPreference()
   const onboardingDone = configService.get('onboardingDone') === true
-  const startInBackground = onboardingDone && isSilentStartupEnabled()
+  const startInBackground = onboardingDone && isSilentStartupEnabled() && !process.argv.includes('--show')
   shouldShowMain = onboardingDone
 
   if (!startInBackground) {
@@ -4850,6 +4925,8 @@ const shutdownAppServices = async (): Promise<void> => {
 }
 
 app.on('before-quit', () => {
+  try { shutdownSnapshots() } catch (error) { console.warn('[Snapshot] Failed to persist paused state:', String(error)) }
+  globalShortcut.unregisterAll()
   void shutdownAppServices()
 })
 

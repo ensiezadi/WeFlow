@@ -1,4 +1,5 @@
 import './HomePage.scss'
+import { Link } from 'react-router-dom'
 
 function HomePage() {
   return (
@@ -16,6 +17,7 @@ function HomePage() {
           ))}
         </div>
         <p className="home-subtitle">每一条消息的背后，都藏着一段温暖的时光</p>
+        <Link className="home-diary-entry" to="/diary">写一篇聊天日记 →</Link>
       </div>
     </div>
   )

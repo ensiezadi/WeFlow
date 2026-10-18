@@ -7,6 +7,19 @@ type CloseConfirmPayload = {
 
 // 暴露给渲染进程的 API
 contextBridge.exposeInMainWorld('electronAPI', {
+  diary: {
+    snapshots: (day?: string) => ipcRenderer.invoke('diary:snapshots', day),
+    snapshotEnabled: (enabled: boolean) => ipcRenderer.invoke('diary:snapshotEnabled', enabled),
+    snapshotNow: () => ipcRenderer.invoke('diary:snapshotNow'),
+    snapshotImage: (day: string, id: string) => ipcRenderer.invoke('diary:snapshotImage', day, id),
+    snapshotNote: (day: string, id: string, note: string) => ipcRenderer.invoke('diary:snapshotNote', day, id, note),
+    workflowEdit: (day: string, edit: import('../src/types/workflow').WorkflowEdit) => ipcRenderer.invoke('diary:workflowEdit', day, edit),
+    workflowSettings: (settings: import('../src/types/workflow').WorkflowSettings) => ipcRenderer.invoke('diary:workflowSettings', settings),
+    deviceTimeline: (day?: string) => ipcRenderer.invoke('diary:deviceTimeline', day),
+    openDeviceArchive: () => ipcRenderer.invoke('diary:openDeviceArchive'),
+    importDeviceArchive: () => ipcRenderer.invoke('diary:importDeviceArchive'),
+    save: (payload: { day: string; format: 'md' | 'json'; content: string }) => ipcRenderer.invoke('diary:save', payload)
+  },
   // 配置
   config: {
     get: (key: string) => ipcRenderer.invoke('config:get', key),

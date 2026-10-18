@@ -1,0 +1,111 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { mkdir, mkdtemp, readFile, writeFile, readdir, symlink } from 'node:fs/promises'
+import { dirname, join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { build } from 'esbuild'
+
+await mkdir(resolve('logs'), { recursive: true })
+const scratch = await mkdtemp(resolve('logs/archive-migration-test-'))
+const compiled = join(scratch, 'migration.mjs')
+await build({ entryPoints: [resolve('electron/services/deviceArchiveMigration.ts')], outfile: compiled, bundle: true, platform: 'node', format: 'esm' })
+const { importDeviceArchive } = await import(pathToFileURL(compiled).href)
+async function fixture(name, sourceName = 'source') {
+  const source = join(scratch, name, sourceName), destination = join(scratch, name, 'saved')
+  await mkdir(join(source, 'snapshots', '2026-10-18'), { recursive: true })
+  await mkdir(join(source, 'snapshots', 'context'))
+  await mkdir(join(source, 'snapshots', 'agent-runtime'))
+  await mkdir(join(source, '2026-10-18'))
+  await writeFile(join(source, 'snapshots', '2026-10-18', 'note.json'), '{"note":"完成工作"}')
+  await writeFile(join(source, 'snapshots', 'context', '2026-10-18.jsonl'), '{"kind":"evidence"}\n')
+  await writeFile(join(source, 'snapshots', 'settings.json'), JSON.stringify({ enabled: true, deniedApps: ['game.exe'], contextEnabled: false }))
+  await writeFile(join(source, 'snapshots', 'agent-status.json'), '{"pid":123}')
+  await writeFile(join(source, 'snapshots', 'agent-runtime', 'agent.exe'), 'runtime')
+  await writeFile(join(source, '2026-10-18', 'latest.json'), '{"revision":"original"}')
+  return { source, destination }
+}
+test('imports dated evidence and timeline into app storage without runtime state; source stays intact', async () => {
+  const { source, destination } = await fixture('copy')
+  const result = await importDeviceArchive(source, destination)
+  assert.equal(result.copied, 3)
+  assert.equal(await readFile(join(destination, 'snapshots', '2026-10-18', 'note.json'), 'utf8'), await readFile(join(source, 'snapshots', '2026-10-18', 'note.json'), 'utf8'))
+  assert.equal(await readFile(join(destination, '2026-10-18', 'latest.json'), 'utf8'), '{"revision":"original"}')
+  const settings = JSON.parse(await readFile(join(destination, 'snapshots', 'settings.json'), 'utf8'))
+  assert.equal(settings.enabled, false)
+  assert.equal(settings.contextEnabled, false)
+  assert.deepEqual(settings.deniedApps, ['game.exe'])
+  assert.equal((await readdir(join(destination, 'snapshots'))).includes('agent-runtime'), false)
+  assert.equal((await readdir(join(destination, 'snapshots'))).includes('agent-status.json'), false)
+  assert.equal(JSON.parse(await readFile(join(source, 'snapshots', 'settings.json'), 'utf8')).enabled, true)
+})
+test('reopening never restores old annotations over edited app records', async () => {
+  const { source, destination } = await fixture('idempotent')
+  await importDeviceArchive(source, destination)
+  const file = join(destination, 'snapshots', '2026-10-18', 'note.json')
+  await writeFile(file, '{"note":"已补记"}')
+  assert.equal((await importDeviceArchive(source, destination)).alreadyImported, true)
+  assert.equal(await readFile(file, 'utf8'), '{"note":"已补记"}')
+})
+test('conflicting records fail before copying and preserve existing notes', async () => {
+  const { source, destination } = await fixture('conflict')
+  await mkdir(join(destination, 'snapshots', '2026-10-18'), { recursive: true })
+  const file = join(destination, 'snapshots', '2026-10-18', 'note.json')
+  await writeFile(file, 'newer')
+  await assert.rejects(importDeviceArchive(source, destination), /未覆盖/)
+  assert.equal(await readFile(file, 'utf8'), 'newer')
+  assert.deepEqual(await readdir(destination), ['snapshots'])
+})
+test('settings retain exclusions from both archives and remain paused', async () => {
+  const { source, destination } = await fixture('settings')
+  await mkdir(join(destination, 'snapshots'), { recursive: true })
+  await writeFile(join(destination, 'snapshots', 'settings.json'), JSON.stringify({ enabled: true, deniedApps: ['password.exe'] }))
+  await importDeviceArchive(source, destination)
+  const settings = JSON.parse(await readFile(join(destination, 'snapshots', 'settings.json'), 'utf8'))
+  assert.deepEqual(settings.deniedApps, ['game.exe', 'password.exe'])
+  assert.equal(settings.enabled, false)
+})
+test('rejects nested paths and directory junctions instead of writing outside app storage', async () => {
+  const { source, destination } = await fixture('paths')
+  await assert.rejects(importDeviceArchive(source, join(source, 'nested')), /互相包含/)
+  const outside = join(scratch, 'outside')
+  await mkdir(outside)
+  await mkdir(destination, { recursive: true })
+  await symlink(outside, join(destination, 'snapshots'), process.platform === 'win32' ? 'junction' : 'dir')
+  await assert.rejects(importDeviceArchive(source, destination), /链接/)
+  assert.deepEqual(await readdir(outside), [])
+})
+test('history includes workflow days without images while sampling quotas still use today', async () => {
+  const module = join(scratch, 'snapshot.mjs')
+  await build({ entryPoints: [resolve('electron/services/snapshotArchive.ts')], outfile: module, bundle: true, platform: 'node', format: 'esm' })
+  const { snapshotStatus } = await import(pathToFileURL(module).href)
+  const root = join(scratch, 'history')
+  await mkdir(join(root, 'context'), { recursive: true })
+  await writeFile(join(root, 'context', '2026-10-18.jsonl'), '')
+  assert.equal((await snapshotStatus(root, undefined, Date.parse('2026-10-19T01:00:00+08:00'))).day, '2026-10-19')
+  assert.equal((await snapshotStatus(root, '2026-10-19')).day, '2026-10-19')
+  assert.deepEqual((await snapshotStatus(root)).days, ['2026-10-18'])
+})
+test('normal app startup imports legacy records once and uses persistent profile storage without launch arguments', async () => {
+  const { source, destination } = await fixture('app-start', 'local-diary-archive')
+  const profile = join(destination, 'profile')
+  const module = join(scratch, 'app-service.mjs')
+  await build({
+    entryPoints: [resolve('electron/services/snapshotService.ts')], outfile: module, bundle: true, platform: 'node', format: 'esm',
+    plugins: [{ name: 'electron-fixture', setup(builder) {
+      builder.onResolve({ filter: /^electron$/ }, () => ({ path: 'electron', namespace: 'fixture' }))
+      builder.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: `export const app = { isPackaged: true, getPath: () => ${JSON.stringify(profile)}, getAppPath: () => ${JSON.stringify(dirname(source))} }` }))
+    } }]
+  })
+  const service = await import(pathToFileURL(module).href)
+  assert.equal(service.snapshotRoot(), join(profile, 'device-diary-archive', 'snapshots'))
+  await service.initializeSnapshots()
+  const view = await service.getSnapshots()
+  assert.equal(view.day, '2026-10-18')
+  assert.equal(view.enabled, false)
+  assert.equal(view.migrationWarning, '')
+  const note = join(service.snapshotRoot(), '2026-10-18', 'note.json')
+  await writeFile(note, 'app annotation')
+  await service.initializeSnapshots()
+  assert.equal(await readFile(note, 'utf8'), 'app annotation')
+  assert.equal(await readFile(join(source, 'snapshots', '2026-10-18', 'note.json'), 'utf8'), '{"note":"完成工作"}')
+})

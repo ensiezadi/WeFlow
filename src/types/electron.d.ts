@@ -314,6 +314,19 @@ export type CloseConfirmPayload = {
 }
 
 export interface ElectronAPI {
+  diary: {
+    snapshots: (day?: string) => Promise<import('./snapshot').SnapshotView>
+    snapshotEnabled: (enabled: boolean) => Promise<void>
+    snapshotNow: () => Promise<import('./snapshot').SnapshotView>
+    snapshotImage: (day: string, id: string) => Promise<string>
+    snapshotNote: (day: string, id: string, note: string) => Promise<void>
+    workflowEdit: (day: string, edit: import('./workflow').WorkflowEdit) => Promise<void>
+    workflowSettings: (settings: import('./workflow').WorkflowSettings) => Promise<void>
+    deviceTimeline: (day?: string) => Promise<import('./deviceTimeline').DeviceTimelineResult>
+    openDeviceArchive: () => Promise<string>
+    importDeviceArchive: () => Promise<{ canceled?: boolean; copied?: number; alreadyImported?: boolean }>
+    save: (payload: { day: string; format: 'md' | 'json'; content: string }) => Promise<{ success: boolean; canceled?: boolean; filePath?: string; error?: string }>
+  }
   window: {
     minimize: () => void
     maximize: () => void
