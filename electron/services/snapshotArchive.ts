@@ -37,12 +37,17 @@ export async function snapshotStatus(root: string, requestedDay?: string, now = 
   if (requestedDay && !validDay(requestedDay)) throw new Error('日期格式无效')
   let entries: string[] = []
   try { entries = await readdir(root) } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
-  const days = entries.map(String).filter(validDay).sort().reverse()
+  let contextDays: string[] = []
+  try { contextDays = (await readdir(join(root, 'context'))).filter(name => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(name)).map(name => name.slice(0, 10)) }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
+  const days = [...new Set([...entries.map(String).filter(validDay), ...contextDays])].sort().reverse()
   const day = requestedDay || snapshotDay(now)
   const records: SnapshotRecord[] = []
   let usedBytes = 0
   for (const date of days) {
-    for (const name of await readdir(join(root, date))) {
+    let dateFiles: string[] = []
+    try { dateFiles = await readdir(join(root, date)) } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
+    for (const name of dateFiles) {
       if (/^[a-f0-9-]{36}\.jpg$/.test(name)) usedBytes += (await stat(join(root, date, name))).size
       if (date === day && /^[a-f0-9-]{36}\.json$/.test(name)) {
         const record: SnapshotRecord = await readJson(join(root, date, name))

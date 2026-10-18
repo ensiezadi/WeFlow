@@ -54,7 +54,7 @@ node scripts/verify-windows-package.cjs
 - `release-local/*-x64-Setup.exe`：Windows 安装包，带 `local` 版本标识。
 - `release-local/win-unpacked/WeFlow.exe`：无需安装，可直接运行。
 - `release-local/build-info.json`：源码提交、构建时间和安装包 SHA256。
-- 仓库根目录的 `Start-WeFlow.cmd` 优先打开此解包版，并使用已有的本地日记归档。
+- 直接打开解包版或安装后的软件即可查看记录，数据统一保存在应用用户目录，重启和升级后保留。附近的旧归档首次启动自动复制迁入，也可在日记页选择「导入已有记录」。`Start-WeFlow.cmd` 为可选快捷入口。
 
 本地测试版本不会自动检查上游更新，也不会创建后台采集计划任务。
 详见 [Windows 本地运行与构建](docs/WINDOWS-LOCAL-RUN.md)。

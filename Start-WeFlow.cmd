@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 if exist "release-local\win-unpacked\WeFlow.exe" (
-  start "" "release-local\win-unpacked\WeFlow.exe" "--show" "--snapshot-root" "%~dp0local-diary-archive\snapshots"
+  start "" "release-local\win-unpacked\WeFlow.exe" "--show"
   exit /b 0
 )
 if not exist "node_modules\electron\dist\electron.exe" (

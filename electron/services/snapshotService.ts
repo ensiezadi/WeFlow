@@ -1,16 +1,18 @@
 import { app } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
-import { join, isAbsolute } from 'node:path'
+import { join, isAbsolute, dirname } from 'node:path'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { snapshotStatus, snapshotEnabled, setSnapshotEnabled, snapshotImage, noteSnapshot } from './snapshotArchive'
 import { readWorkflow, editWorkflow, updateWorkflowSettings } from './workflowArchive'
 import { snapshotLaunchArguments } from './snapshotLaunch'
+import { importDeviceArchive } from './deviceArchiveMigration'
 import type { WorkflowEdit, WorkflowSettings } from '../../src/types/workflow'
 
 let watcher: ChildProcess | undefined
 let closing = false
+let migrationWarning = ''
 export function snapshotRoot() {
   const rootIndex = process.argv.indexOf('--snapshot-root')
   if (rootIndex >= 0) {
@@ -18,12 +20,12 @@ export function snapshotRoot() {
     if (!root || !isAbsolute(root)) throw new Error('归档目录必须为绝对路径')
     return root
   }
-  return app.isPackaged ? join(app.getPath('userData'), 'device-diary-archive', 'snapshots')
-    : join(app.getAppPath(), 'local-diary-archive', 'snapshots')
+  return join(app.getPath('userData'), 'device-diary-archive', 'snapshots')
 }
 export const getSnapshots = async (day?: string) => {
-  const status = await snapshotStatus(snapshotRoot(), day)
-  return { ...status, workflow: await readWorkflow(snapshotRoot(), status.day) }
+  let status = await snapshotStatus(snapshotRoot(), day)
+  if (!day && !status.days.includes(status.day) && status.days[0]) status = await snapshotStatus(snapshotRoot(), status.days[0])
+  return { ...status, storagePath: dirname(snapshotRoot()), migrationWarning, workflow: await readWorkflow(snapshotRoot(), status.day) }
 }
 let settingsQueue: Promise<unknown> = Promise.resolve()
 function changeSettings<T>(action: () => Promise<T>) {
@@ -45,7 +47,22 @@ function launch(mode: 'watch' | 'manual') {
 export async function initializeSnapshots() {
   // Every app session starts paused; installation and app startup never start capture.
   await setSnapshotEnabled(snapshotRoot(), false)
+  if (process.argv.includes('--snapshot-root')) return
+  const candidates = new Set([join(app.getAppPath(), 'local-diary-archive')])
+  let directory = dirname(process.execPath)
+  for (let level = 0; level < 3; level++) { candidates.add(join(directory, 'local-diary-archive')); directory = dirname(directory) }
+  for (const source of candidates) {
+    if (!existsSync(source)) continue
+    try { await importDeviceArchive(source, dirname(snapshotRoot())) }
+    catch (error) { migrationWarning = `旧记录导入未完成：${error instanceof Error ? error.message : String(error)}` }
+  }
 }
+export const importSavedDeviceArchive = (source: string) => changeSettings(async () => {
+  if (await snapshotEnabled(snapshotRoot())) throw new Error('请先停止采集，再导入已有记录')
+  const result = await importDeviceArchive(source, dirname(snapshotRoot()))
+  migrationWarning = ''
+  return result
+})
 export function shutdownSnapshots() {
   closing = true
   const root = snapshotRoot()

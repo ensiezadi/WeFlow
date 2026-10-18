@@ -45,17 +45,23 @@ export default function SnapshotPanel() {
         <button className="diary-button" disabled={!view || busy} onClick={() => void run(() => window.electronAPI.diary.snapshotEnabled(!view?.enabled))}>{view?.enabled ? '停止采集' : '开启本次采集'}</button>
         <button className="diary-button" disabled={!view?.enabled || busy} onClick={() => void run(async () => { await window.electronAPI.diary.snapshotNow(); setDay('') })}>{busy ? '处理中…' : '现在记一张'}</button>
         <button className="diary-button" onClick={() => void run(() => window.electronAPI.diary.openDeviceArchive())}>打开归档目录</button>
+        <button className="diary-button" disabled={busy || view?.enabled} onClick={() => void run(async () => {
+          const result = await window.electronAPI.diary.importDeviceArchive()
+          if (!result.canceled) { setDay(''); setSaved(result.alreadyImported ? '这些记录已经保存在软件中。' : '已有记录已导入，原文件保留。') }
+        })}>导入已有记录</button>
       </div>
     </div>
     {error && <p className="diary-error" role="alert">{error}</p>}
     {saved && <p className="diary-fact-label" role="status">{saved}</p>}
     {view && <>
+      <p className="diary-fact-label">记录自动保存在本机，重新打开或升级软件后仍可查看。{view.storagePath && <span title={view.storagePath}>「打开归档目录」可查看保存位置。</span>}</p>
+      {view.migrationWarning && <p className="diary-error" role="alert">{view.migrationWarning}</p>}
       <p className="diary-fact-label">{view.enabled ? '采样已开启' : '采样已暂停'} · {view.day} 已留 {view.count} 张 · 图片占用 {(view.usedBytes / 1024 / 1024).toFixed(1)} / 200 MB</p>
       <p className="diary-fact-label">每次打开应用默认关闭采集，手动开启后仅在本次应用运行期间生效；停止采集或退出应用会停止代理。安装和启动应用均不创建后台计划任务。</p>
       <p className="diary-fact-label">记录前台应用、窗口标题和画面文字，相似文字合并；游戏、全屏演示、锁屏和闲置时暂停。代表截图每天最多 20 张、自动保存至少间隔 10 分钟，图片空间上限 200 MB。</p>
       <p className="diary-fact-label">采集代理：{!view.enabled ? '已关闭' : view.agent && Date.now() - Date.parse(view.agent.heartbeatAt) < 90000 ? '运行中' : '正在启动或已退出'} · 本地 OCR：{!view.enabled ? '已关闭' : view.agent?.ocrState || '等待连接'}{view.enabled && view.agent?.ocrLanguages?.length ? `（${view.agent.ocrLanguages.join('、')}）` : ''}。{view.enabled && view.agent?.contextResult}</p>
       <p className="diary-fact-label">{view.lastCheck ? `最近检查：${new Date(view.lastCheck).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })} · ${view.lastResult}` : '等待首次采样。'}　随时按 Ctrl + Alt + F8 记一张。</p>
-      <div className="diary-actions snapshot-date"><label>记录日期 <input type="date" value={day || view.day} onChange={event => setDay(event.target.value)} /></label><button className="diary-button" onClick={() => setReload(value => value + 1)}>刷新记录</button></div>
+      <div className="diary-actions snapshot-date"><label>记录日期 <input type="date" value={day || view.day} onChange={event => setDay(event.target.value)} /></label>{view.days.length > 0 && <label>历史记录 <select value={view.days.includes(day || view.day) ? day || view.day : ''} onChange={event => setDay(event.target.value)}><option value="" disabled>选择日期</option>{view.days.map(date => <option key={date} value={date}>{date}</option>)}</select></label>}<button className="diary-button" onClick={() => setReload(value => value + 1)}>刷新记录</button></div>
       {view.workflow && <WorkflowPanel view={view.workflow} day={view.day} images={images} refresh={() => setReload(value => value + 1)} />}
       <h3>代表截图与旧记录</h3>
       {!view.records.length && <p>当天还没有代表截图，可以主动记下一张。</p>}

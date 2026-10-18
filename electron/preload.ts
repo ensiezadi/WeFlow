@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     workflowSettings: (settings: import('../src/types/workflow').WorkflowSettings) => ipcRenderer.invoke('diary:workflowSettings', settings),
     deviceTimeline: (day?: string) => ipcRenderer.invoke('diary:deviceTimeline', day),
     openDeviceArchive: () => ipcRenderer.invoke('diary:openDeviceArchive'),
+    importDeviceArchive: () => ipcRenderer.invoke('diary:importDeviceArchive'),
     save: (payload: { day: string; format: 'md' | 'json'; content: string }) => ipcRenderer.invoke('diary:save', payload)
   },
   // 配置

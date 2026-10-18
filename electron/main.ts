@@ -28,7 +28,7 @@ import { exportCardDiagnosticsService } from './services/exportCardDiagnosticsSe
 import { cloudControlService } from './services/cloudControlService'
 import { telegramService } from './services/telegramService'
 import { readDeviceTimeline } from './services/deviceTimelineService'
-import { getSnapshots, enableSnapshots, getSnapshotImage, saveSnapshotNote, captureSnapshotNow, saveWorkflowEdit, saveWorkflowSettings, initializeSnapshots, shutdownSnapshots, snapshotRoot } from './services/snapshotService'
+import { getSnapshots, enableSnapshots, getSnapshotImage, saveSnapshotNote, captureSnapshotNow, saveWorkflowEdit, saveWorkflowSettings, initializeSnapshots, shutdownSnapshots, snapshotRoot, importSavedDeviceArchive } from './services/snapshotService'
 
 import { destroyNotificationWindow, registerNotificationHandlers, showNotification, setNotificationNavigateHandler } from './windows/notificationWindow'
 import { httpService } from './services/httpService'
@@ -2273,6 +2273,15 @@ function registerIpcHandlers() {
     await mkdir(deviceArchivePath, { recursive: true })
     const { shell } = await import('electron')
     return shell.openPath(deviceArchivePath)
+  })
+  ipcMain.handle('diary:importDeviceArchive', async (event) => {
+    if (await getSnapshots().then(view => view.enabled)) throw new Error('请先停止采集，再导入已有记录')
+    const { dialog } = await import('electron')
+    const owner = BrowserWindow.fromWebContents(event.sender)
+    if (!owner) throw new Error('找不到日记窗口')
+    const selected = await dialog.showOpenDialog(owner, { title: '选择已有记录的归档目录', properties: ['openDirectory'] })
+    if (selected.canceled || !selected.filePaths[0]) return { canceled: true }
+    return importSavedDeviceArchive(selected.filePaths[0])
   })
 
   ipcMain.handle('diary:save', async (event, payload: unknown) => {

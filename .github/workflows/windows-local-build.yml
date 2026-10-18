@@ -22,7 +22,7 @@ jobs:
         run: npm install --global npm@10.9.2
       - run: npm ci
       - name: Verify archive, game guards and launch arguments
-        run: node --test tests/chatDiary.test.mjs tests/deviceTimeline.test.cjs tests/snapshots.test.mjs tests/workflow.test.mjs tests/workflowGameGuard.test.mjs tests/snapshotPackaging.test.mjs
+        run: node --test tests/chatDiary.test.mjs tests/deviceTimeline.test.cjs tests/snapshots.test.mjs tests/workflow.test.mjs tests/workflowGameGuard.test.mjs tests/snapshotPackaging.test.mjs tests/deviceArchiveMigration.test.mjs
       - name: Build Windows x64 installer
         run: npm run build:win:local
       - name: Verify packaged agent and frontend

@@ -324,6 +324,7 @@ export interface ElectronAPI {
     workflowSettings: (settings: import('./workflow').WorkflowSettings) => Promise<void>
     deviceTimeline: (day?: string) => Promise<import('./deviceTimeline').DeviceTimelineResult>
     openDeviceArchive: () => Promise<string>
+    importDeviceArchive: () => Promise<{ canceled?: boolean; copied?: number; alreadyImported?: boolean }>
     save: (payload: { day: string; format: 'md' | 'json'; content: string }) => Promise<{ success: boolean; canceled?: boolean; filePath?: string; error?: string }>
   }
   window: {
